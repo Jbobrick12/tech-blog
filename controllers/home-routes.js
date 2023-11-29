@@ -1,91 +1,78 @@
-const router = require('express').Router();
-const { Post, User, Comment } = require('../../models');
-const withAuth = require('../../utils/auth');
+const router = require("express").Router();
+const { Post, User, Comment } = require("../models");
+const isAuth = require("../utils/auth");
 
-// GET route for all posts for the homepage
-router.get('/', async (req, res) => {
-    try {
-        const postData = await Post.findAll({
-            include: [
-                {
-                    model: User,
-                    attributes: ['username']
-                },
-                {
-                    model: Comment,
-                    attributes: ['id', 'content', 'post_id', 'user_id', 'created_at'],
-                    include: {
-                        model: User,
-                        attributes: ['username']
-                    }
-                }
-            ]
-        });
-        const posts = postData.map((post) => post.get({ plain: true }));
-        // rendering all posts on the homepage
-        res.render('homepage', {
-            posts,
-            logged_in: req.session.logged_in
-        });
-        res.status(200).json(postData);
-    } catch (err) {
-        res.status(500).json(err);
-    }
-}
-);
+//login handler
+router.get("/login", (req, res) => {
+  if (req.session.loggedIn) {
+    res.redirect("/");
+  } else {
+    res.render("login");
+  }
+});
 
-// GET route for a single post
-router.get('/:id', async (req, res) => {
+//get all posts
+router.get("/", async (req, res) => {
+  console.log("get all posts");
+  try {
+    const postData = await Post.findAll({
+      include: [
+        {
+          model: User,
+          attributes: ["name"],
+        },
+      ],
+    });
+
+    const posts = postData.map((post) => post.get({ plain: true }));
+
+    res.render("homepage", {
+      posts,
+      loggedIn: req.session.loggedIn,
+    });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json(err);
+  }
+});
+
+//get a specific post
+router.get("/post/:id", async (req, res) => {
+  //check for login
+  if ((req.session.loggedIn = false)) {
+    res.redirect("/login");
+  } else {
     try {
-        const postData = await Post.findOne({
-            where: {
-                id: req.params.id
+      const postData = await Post.findByPk(req.params.id, {
+        include: [
+          {
+            model: User,
+            attributes: ["name"],
+          },
+          {
+            model: Comment,
+            include: {
+              model: User,
+              attributes: ["name"],
             },
-            include: [
-                {
-                    model: User,
-                    attributes: ['username']
-                },
-                {
-                    model: Comment,
-                    attributes: ['id', 'content', 'post_id', 'user_id', 'created_at'],
-                    include: {
-                        model: User,
-                        attributes: ['username']
-                    }
-                }
-            ]
-        });
+          },
+        ],
+      });
+
+      if (postData) {
         const post = postData.get({ plain: true });
-        // rendering a single post
-        res.render('single-post', {
-            post,
-            logged_in: req.session.logged_in
+        res.render("viewpost", {
+          post,
+          loggedIn: req.session.loggedIn,
         });
-        res.status(200).json(postData);
+      } else {
+        res.status(404).json({ message: "No post found" });
+      }
     } catch (err) {
-        res.status(500).json(err);
+      console.log(err);
+      res.status(500).json(err);
     }
-}
-);
-
-// login and signup routes
-router.get('/login', async (req, res) => {
-    try {
-        res.render('login');
-    } catch (err) {
-        res.status(500).json(err);
-    }
-}
-);
-
-router.get('/signup', async (req, res) => {
-    try {
-        res.render('signup');
-    } catch (err) {
-        res.status(500).json(err);
-    }
-}
-);
+  }
+});
 
 module.exports = router;
